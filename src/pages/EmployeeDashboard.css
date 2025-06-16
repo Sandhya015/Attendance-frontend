@@ -1,23 +1,38 @@
-/* FULL UPDATED EmployeeDashboard.css WITH ICONS, NAVBAR SPACING, AND TRANSPARENT BUTTONS */
+/* FULL UPDATED EmployeeDashboard.css WITH ICONS, NAVBAR SPACING, TRANSPARENT BUTTONS */
+/* Updated: 
+   - Mobile view responsiveness removed 
+   - Main-area/page is scrollable (not static), sidebar remains fixed
+*/
 
 body, html {
   margin: 0;
   font-family: 'Segoe UI', sans-serif;
   background: #f4f5f7;
+  height: 100%;
+  overflow: hidden; /* Prevent double scrollbars */
 }
 
 .dashboard-container {
   display: flex;
   min-height: 100vh;
+  height: 100vh;
+  overflow: hidden; /* Prevent double scrollbars */
 }
 
+/* SIDEBAR - Fixed, Always Visible */
 .sidebar {
-  width: 300px;
+  width: 270px;
   background: #1f2937;
   color: white;
   padding: 1.5rem 1rem;
   display: flex;
   flex-direction: column;
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  z-index: 1001;
+  overflow: hidden;
 }
 
 .sidebar-logo {
@@ -57,33 +72,20 @@ body, html {
   min-width: 20px;
 }
 
-/* MATCH CARD HEIGHTS IN SUMMARY */
-.summary-cards {
-  display: flex;
-  gap: 1rem;
-  margin-bottom: 2rem;
-}
-
-.summary-cards .card {
-  min-height: 120px;
-  height: 160px;           /* Enforce all summary cards to have the same height */
-  flex: 1 1 0;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  text-align: center;
-  box-sizing: border-box;
-}
-
+/* MAIN AREA - Scrollable! */
 .main-area {
   flex: 1;
   display: flex;
   flex-direction: column;
+  margin-left: 300px; /* width of sidebar */
+  height: 100vh;
+  overflow-y: auto;
+  background: #f4f5f7;
 }
 
+/* NAVBAR */
 .dashboard-navbar {
-  height: 100px;
+  height: 130px;
   background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(6px);
   border-bottom: 1px solid #e0e0e0;
@@ -105,18 +107,6 @@ body, html {
   align-items: center;
 }
 
-/* .dashboard-navbar .tabs button {
-  background: rgba(255, 255, 255, 0.5);
-  border: 1px solid #ccc;
-  border-radius: 999px;
-  padding: 8px 16px;
-  color: #333;
-  font-size: 14px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  font-weight: 500;
-} */
-
 .dashboard-navbar .tabs button.active,
 .dashboard-navbar .tabs button:hover {
   background-color: #8991a1;
@@ -124,16 +114,40 @@ body, html {
   border-color: transparent;
 }
 
+/* NAVBAR LOGO TOP RIGHT */
+.navbar-logo-top-right {
+  height: 40px;
+  width: auto;
+  margin-left: auto;
+  margin-right: 12px;
+  display: block;
+}
+
+/* MAIN CONTENT */
 .main-content {
   flex: 1;
   padding: 2rem;
-  min-height: calc(100vh - 100px);
+  min-height: calc(100vh - 140px);
+  /* Scrollable with main-area */
 }
 
+/* SUMMARY CARDS */
 .summary-cards {
   display: flex;
   gap: 1rem;
   margin-bottom: 2rem;
+}
+
+.summary-cards .card {
+  min-height: 120px;
+  height: 160px;
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  box-sizing: border-box;
 }
 
 .card {
@@ -284,7 +298,6 @@ h1 {
   max-width: 500px;
   width: 100%;
   margin-top: 1rem;
- 
 }
 
 .leave-form label {
@@ -293,7 +306,6 @@ h1 {
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
-  
 }
 
 .leave-form input[type="date"] {
@@ -335,18 +347,10 @@ h1 {
 
 .dashboard-profile-chart {
   display: flex;
-  flex-wrap: wrap;
-  gap: 2rem;
-  align-items: flex-start;
-  justify-content: space-between;
-}
-.dashboard-profile-chart {
-  display: flex;
   gap: 2rem;
   align-items: stretch;
   justify-content: space-between;
   flex-wrap: wrap;
-  
 }
 
 .profile-summary {
@@ -387,23 +391,11 @@ h1 {
   justify-content: center;
   align-items: center;
 }
-.close-btn { background: none; border: none; cursor: pointer; font-size: 18px; color: #888; }
-.attendance-form-modal { background: #f7f7f7; border-radius: 7px; padding: 1rem 1.5rem; margin: 1rem 0; box-shadow: 0 1px 5px rgba(0,0,0,0.10); }
 
 /* --- NEW/UPDATED STYLES FOR RECENT FEATURES (DO NOT CHANGE EXISTING LAYOUT OR SIZES) --- */
 
-/* NAVBAR LOGO TOP RIGHT (already added in markup) */
-.navbar-logo-top-right {
-  height: 40px;
-  width: auto;
-  margin-left: auto;
-  margin-right: 12px;
-  display: block;
-}
-
 /* --- CALENDAR INPUT (Check-in/Leave) --- */
 .calendar-input {
-  /* Make the calendar look more like your screenshot (image1) */
   height: 36px;
   font-size: 16px;
   border-radius: 6px;
@@ -421,13 +413,7 @@ h1 {
   margin-top: 1.5rem;
 }
 
-/* Responsive fallback: stack on smaller screens */
-@media (max-width: 900px) {
-  .leave-tab-grid {
-    grid-template-columns: 1fr;
-    gap: 1.5rem;
-  }
-}
+/* Responsive fallback removed: leave-tab-grid always side by side */
 
 /* Each card in the leave tab grid */
 .leave-form-card, .leave-history-card {
@@ -511,65 +497,12 @@ h1 {
   gap: 0.4rem;
 }
 
-/* Hamburger Button */
+/* Hamburger Button - REMOVED MOBILE RESPONSIVENESS (Always hidden) */
 .hamburger-btn {
   display: none;
-  background: none;
-  border: none;
-  font-size: 26px;
-  color: #1f2937;
-  cursor: pointer;
-  margin-right: 12px;
 }
 
-@media (max-width: 768px) {
-  .sidebar {
-    position: fixed;
-    top: 0;
-    left: 0;
-    height: 100%;
-    width: 260px;
-    background: #1f2937;
-    transform: translateX(-100%);
-    transition: transform 0.3s ease;
-    z-index: 999;
-  }
-
-  .sidebar.sidebar-open {
-    transform: translateX(0);
-  }
-
-  .dashboard-navbar {
-    padding-left: 1rem;
-    justify-content: space-between;
-  }
-
-  .hamburger-btn {
-    display: block;
-  }
-
-  .dashboard-container {
-    flex-direction: column;
-  }
-
-  .main-area {
-    margin-left: 0;
-  }
-}
-.sidebar {
-  z-index: 1001;
-}
-
+/* Sidebar overlay - always hidden (not used on desktop/static layout) */
 .sidebar-overlay {
-  z-index: 1000;
-}
-
-.sidebar-overlay.visible {
-  display: block;
-  position: fixed;
-  top: 0; left: 0;
-  width: 100vw;
-  height: 100vh;
-  background: rgba(0, 0, 0, 0.4);
-  z-index: 998;
+  display: none !important;
 }

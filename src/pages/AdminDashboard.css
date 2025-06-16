@@ -1,6 +1,3 @@
-
-
-
 /* AdminDashboard.css */
 
 .admin-container {
@@ -9,6 +6,8 @@
   padding: 20px;
   background: #f5f7fa;
   min-height: 100vh;
+  height: 100vh;
+  overflow: hidden; /* Prevent body from scrolling, let .admin-card scroll */
 }
 
 .admin-card {
@@ -18,6 +17,10 @@
   border-radius: 12px;
   padding: 30px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  height: 100vh;
+  overflow-y: auto; /* Make the admin main area scrollable */
+  display: flex;
+  flex-direction: column;
 }
 
 .admin-header-flex {
@@ -31,7 +34,6 @@
   align-items: center;
   gap: 350px;
 }
-
 
 .admin-logo-title img {
   width: 150px;
@@ -211,7 +213,6 @@ tbody tr:hover {
   background-color: #2980b9;
 }
 
-
 .pagination {
   display: flex;
   justify-content: center;
@@ -306,4 +307,3 @@ tbody tr:hover {
 .add-employee button:hover {
   background-color: #1e40af;
 }
-
