@@ -140,6 +140,9 @@ const AttendanceTab = ({ doj }) => {
   const [pendingCheckoutMsg, setPendingCheckoutMsg] = useState('');
   const [loading, setLoading] = useState(true);
 
+  // Today's date string
+  const todayStr = new Date().toISOString().slice(0, 10);
+
   // Fetch latest attendance status/history
   useEffect(() => {
     async function fetchLastAttendance() {
@@ -195,7 +198,10 @@ const AttendanceTab = ({ doj }) => {
 
   // --- Logic for min/max dates ---
   const minDate = doj || '';
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const checkInMinDate = minDate;
+  const checkInMaxDate = todayStr;
+  const checkOutMinDate = minDate;
+  const checkOutMaxDate = todayStr;
 
   // --- Block check-in if yesterday's checkout is pending ---
   const isCheckInBlocked = !!pendingCheckoutMsg;
@@ -206,14 +212,11 @@ const AttendanceTab = ({ doj }) => {
   // --- Show check-out only if checked-in and admin has approved, and not yet checked out ---
   const isCheckOutDisabled = !hasCheckedIn || hasCheckedOut || !lastCheckIn.approved;
 
-  // --- Only allow selecting today for check-in/checkout (could adjust if you want to allow previous days etc) ---
-  const checkInMaxDate = todayStr;
-  const checkInMinDate = minDate;
-  const checkOutMaxDate = todayStr;
-  const checkOutMinDate = minDate;
-
   // --- Handle Check-In ---
-  const handleCheckIn = () => setShowCheckIn(true);
+  const handleCheckIn = () => {
+    setCheckInDate(todayStr); // Pre-fill with today's date
+    setShowCheckIn(true);
+  };
 
   const handleCheckInSubmit = async (e) => {
     e.preventDefault();
@@ -241,7 +244,10 @@ const AttendanceTab = ({ doj }) => {
   };
 
   // --- Handle Check-Out ---
-  const handleCheckOut = () => setShowCheckOut(true);
+  const handleCheckOut = () => {
+    setCheckOutDate(todayStr); // Pre-fill with today's date
+    setShowCheckOut(true);
+  };
 
   const handleCheckOutSubmit = async (e) => {
     e.preventDefault();
@@ -363,7 +369,6 @@ const AttendanceTab = ({ doj }) => {
               max={checkInMaxDate}
               required
               className="calendar-input"
-              disabled
             />
           </label>
           <label>
@@ -407,7 +412,6 @@ const AttendanceTab = ({ doj }) => {
               max={checkOutMaxDate}
               required
               className="calendar-input"
-              disabled
             />
           </label>
           <label>
@@ -649,15 +653,6 @@ const ProfileTab = ({ employee, setEditMode, editMode, onSave }) => (
         <label>Email
           <input type="email" name="email" defaultValue={employee.email} placeholder="Enter your email address" required />
         </label>
-        {/* <label>Position
-          <input type="text" name="position" defaultValue={employee.position} placeholder="Enter your job title" required />
-        </label> */}
-        {/* <label>Department
-          <input type="text" name="department" defaultValue={employee.department} placeholder="Enter your department" required />
-        </label>
-        <label>Date of Joining
-          <input type="date" name="doj" defaultValue={employee.doj} placeholder="Select your joining date" required />
-        </label> */}
         <label>Blood Group
           <select
             name="bloodGroup"
@@ -761,9 +756,6 @@ const EmployeeDashboard = () => {
     const updated = {
       name: form.name.value,
       email: form.email.value,
-      // position: form.position.value,
-      // department: form.department.value,
-      // doj: form.doj.value,
       bloodGroup: form.bloodGroup.value,
     };
     try {
