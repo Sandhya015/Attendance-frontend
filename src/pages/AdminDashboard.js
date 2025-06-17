@@ -9,11 +9,11 @@ import 'react-toastify/dist/ReactToastify.css';
 import { useNavigate } from 'react-router-dom';
 import './AdminDashboard.css';
 import { FaChartBar, FaClock, FaUserPlus, FaCalendarAlt, FaFileUpload, FaSignOutAlt } from 'react-icons/fa';
-// import logo from '../assets/logooo.jpg'; // Make sure this path is correct or update accordingly
+import logo from '../assets/logooo.jpg'; // Make sure this path is correct
 
 const Sidebar = ({ activeTab, setActiveTab, handleLogout }) => (
-  <aside className="sidebar">
-    <div className="sidebar-logo">Admin</div>
+  <aside className="admin-sidebar">
+    <div className="admin-sidebar-logo">Admin</div>
     <ul>
       <li className={activeTab === 'attendance' ? 'active' : ''} onClick={() => setActiveTab('attendance')}><FaChartBar /> Attendance</li>
       <li className={activeTab === 'pending' ? 'active' : ''} onClick={() => setActiveTab('pending')}><FaClock /> Pending Check-ins</li>
@@ -26,20 +26,18 @@ const Sidebar = ({ activeTab, setActiveTab, handleLogout }) => (
 );
 
 const TopNavbar = () => (
-  <header className="dashboard-navbar">
-    <div className="navbar-title">Admin Dashboard</div>
-    {/* <div style={{ position: "absolute", right: 24, top: 30 }}>
-      <img src={logo} alt="Logo" className="navbar-logo-top-right" style={{ height: 40, width: 'auto', marginRight: 16 }} />
-    </div> */}
+  <header className="admin-dashboard-navbar">
+    <div className="admin-navbar-title">Admin Dashboard</div>
+    <img src={logo} alt="Logo" className="admin-navbar-logo" />
   </header>
 );
 
 const SummaryCards = ({ attendanceStats, leaveRequests, pendingCheckins }) => (
-  <div className="summary-cards">
-    <div className="card"><h4>Pending Check-ins</h4><p>{pendingCheckins.length}</p></div>
-    <div className="card"><h4>Today's Present</h4><p>{attendanceStats.present}</p></div>
-    <div className="card"><h4>Today's On Leave</h4><p>{attendanceStats.leave}</p></div>
-    <div className="card"><h4>Pending Leave Requests</h4><p>{leaveRequests.filter(l => l.status === 'Pending').length}</p></div>
+  <div className="admin-summary-cards">
+    <div className="admin-card"><h4>Pending Check-ins</h4><p>{pendingCheckins.length}</p></div>
+    <div className="admin-card"><h4>Today's Present</h4><p>{attendanceStats.present}</p></div>
+    <div className="admin-card"><h4>Today's On Leave</h4><p>{attendanceStats.leave}</p></div>
+    <div className="admin-card"><h4>Pending Leave Requests</h4><p>{leaveRequests.filter(l => l.status === 'Pending').length}</p></div>
   </div>
 );
 
@@ -223,14 +221,14 @@ const AdminDashboard = () => {
   const totalPages = Math.ceil(filteredRecords.length / recordsPerPage);
 
   return (
-    <div className="dashboard-container">
+    <div className="admin-dashboard-container">
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} handleLogout={handleLogout} />
-      <div className="main-area">
+      <div className="admin-main-area">
         <TopNavbar />
-        <main className="main-content">
+        <main className="admin-main-content">
           {activeTab === 'attendance' && (
             <>
-              <div className="filter-group">
+              <div className="admin-filter-group">
                 <input
                   type="email"
                   placeholder="Filter by Email"
@@ -255,7 +253,7 @@ const AdminDashboard = () => {
                 <button onClick={handleExport}>Export CSV</button>
               </div>
 
-              <div className="summary-section">
+              <div className="admin-summary-section">
                 <SummaryCards attendanceStats={attendanceStats} leaveRequests={leaveRequests} pendingCheckins={pendingCheckins} />
               </div>
 
@@ -277,7 +275,7 @@ const AdminDashboard = () => {
                   </tbody>
                 </table>
 
-                <div className="pagination">
+                <div className="admin-pagination">
                   <button disabled={currentPage === 1} onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}>Previous</button>
                   <span>{currentPage}</span>
                   <button disabled={currentPage === totalPages || totalPages === 0} onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}>Next</button>
@@ -287,7 +285,7 @@ const AdminDashboard = () => {
           )}
 
           {activeTab === 'pending' && (
-            <div className="pending-checkins">
+            <div className="admin-pending-checkins">
               <h3>Pending Check-In Approvals</h3>
               <table>
                 <thead>
@@ -300,8 +298,8 @@ const AdminDashboard = () => {
                       <td>{item.date}</td>
                       <td>{item.checkin_time || '—'}</td>
                       <td>
-                        <button className="approve-btn" onClick={() => handleCheckinDecision(item._id, 'Accepted')}>Accept</button>
-                        <button className="reject-btn" onClick={() => handleCheckinDecision(item._id, 'Rejected')}>Reject</button>
+                        <button className="admin-approve-btn" onClick={() => handleCheckinDecision(item._id, 'Accepted')}>Accept</button>
+                        <button className="admin-reject-btn" onClick={() => handleCheckinDecision(item._id, 'Rejected')}>Reject</button>
                       </td>
                     </tr>
                   ))}
@@ -312,11 +310,11 @@ const AdminDashboard = () => {
 
           {activeTab === 'leave' && (
             <>
-              <div className="summary-cards">
-                <div className="card total">Total Requests: {leaveRequests.length}</div>
-                <div className="card pending">Pending: {leaveRequests.filter(l => l.status === 'Pending').length}</div>
-                <div className="card accepted">Accepted: {leaveRequests.filter(l => l.status === 'Accepted').length}</div>
-                <div className="card rejected">Rejected: {leaveRequests.filter(l => l.status === 'Rejected').length}</div>
+              <div className="admin-summary-cards">
+                <div className="admin-card total">Total Requests: {leaveRequests.length}</div>
+                <div className="admin-card pending">Pending: {leaveRequests.filter(l => l.status === 'Pending').length}</div>
+                <div className="admin-card accepted">Accepted: {leaveRequests.filter(l => l.status === 'Accepted').length}</div>
+                <div className="admin-card rejected">Rejected: {leaveRequests.filter(l => l.status === 'Rejected').length}</div>
               </div>
               <table>
                 <thead><tr><th>Email</th><th>Date</th><th>Reason</th><th>Status</th><th>Actions</th></tr></thead>
@@ -330,8 +328,8 @@ const AdminDashboard = () => {
                       <td>
                         {leave.status === 'Pending' ? (
                           <>
-                            <button onClick={() => handleLeaveDecision(leave._id, 'Accepted')}>Accept</button>
-                            <button onClick={() => handleLeaveDecision(leave._id, 'Rejected')}>Reject</button>
+                            <button className="admin-approve-btn" onClick={() => handleLeaveDecision(leave._id, 'Accepted')}>Accept</button>
+                            <button className="admin-reject-btn" onClick={() => handleLeaveDecision(leave._id, 'Rejected')}>Reject</button>
                           </>
                         ) : '—'}
                       </td>
@@ -343,7 +341,7 @@ const AdminDashboard = () => {
           )}
 
           {activeTab === 'upload' && (
-            <div className="upload-attendance">
+            <div className="admin-upload-attendance">
               <h3>Upload Attendance CSV</h3>
               <input type="file" ref={fileInputRef} accept=".csv" />
               <button onClick={handleUploadAttendance}>Upload</button>
@@ -351,7 +349,7 @@ const AdminDashboard = () => {
           )}
 
           {activeTab === 'add' && (
-            <div className="add-employee">
+            <div className="admin-add-employee">
               <h3>Add New Employee</h3>
               <form onSubmit={handleEmployeeFormSubmit} autoComplete="off">
                 <input
@@ -423,7 +421,7 @@ const AdminDashboard = () => {
                   value={newEmployee.bloodGroup}
                   onChange={e => setNewEmployee({ ...newEmployee, bloodGroup: e.target.value })}
                   required
-                  style={{ marginBottom: 15, padding: "8px", minWidth: 120 }}
+                  className="admin-blood-dropdown"
                 >
                   <option value="">Select Blood Group</option>
                   {bloodGroups.filter(bg => bg !== "").map(bg => (
