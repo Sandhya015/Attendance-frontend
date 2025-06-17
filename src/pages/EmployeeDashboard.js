@@ -16,6 +16,10 @@ import logo from '../assets/logooo.jpg';
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
+const bloodGroups = [
+  "", "A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"
+];
+
 // --- utility: convert hour/min/ampm to "HH:MM" 24-hour string ---
 function to24HourFormat(hour, minute, ampm) {
   hour = parseInt(hour, 10);
@@ -34,7 +38,6 @@ function to12HourFormat(time24) {
   return `${h}:${m} ${ampm}`;
 }
 
-// --- SIDEBAR: Only for desktop, no mobile overlay ---
 const Sidebar = ({ activeTab, setActiveTab, handleLogout }) => (
   <aside className="sidebar">
     <div className="sidebar-logo">Employee</div>
@@ -50,7 +53,6 @@ const Sidebar = ({ activeTab, setActiveTab, handleLogout }) => (
   </aside>
 );
 
-// --- TOP NAVBAR: No hamburger, always visible ---
 const TopNavbar = () => (
   <header className="dashboard-navbar">
     <div className="navbar-title">Employee Dashboard</div>
@@ -121,39 +123,94 @@ const DashboardTab = ({ employee }) => {
 };
 
 const AttendanceTab = ({ doj }) => {
-  // For check-in
   const [checkInDate, setCheckInDate] = useState('');
   const [checkInHour, setCheckInHour] = useState('');
   const [checkInMinute, setCheckInMinute] = useState('');
   const [checkInAMPM, setCheckInAMPM] = useState('AM');
-  // For check-out
   const [checkOutDate, setCheckOutDate] = useState('');
   const [checkOutHour, setCheckOutHour] = useState('');
   const [checkOutMinute, setCheckOutMinute] = useState('');
   const [checkOutAMPM, setCheckOutAMPM] = useState('AM');
-  // Show forms
   const [showCheckIn, setShowCheckIn] = useState(false);
   const [showCheckOut, setShowCheckOut] = useState(false);
-  // State for display
   const [hasCheckedIn, setHasCheckedIn] = useState(false);
-  const [lastCheckIn, setLastCheckIn] = useState({ date: '', time: '' });
+  const [hasCheckedOut, setHasCheckedOut] = useState(false);
+  const [lastCheckIn, setLastCheckIn] = useState({ date: '', time: '', approved: false });
   const [lastCheckOut, setLastCheckOut] = useState({ date: '', time: '' });
+  const [pendingCheckoutMsg, setPendingCheckoutMsg] = useState('');
+  const [loading, setLoading] = useState(true);
 
+  // Fetch latest attendance status/history
   useEffect(() => {
-    setHasCheckedIn(false);
-    setCheckInDate('');
-    setCheckInHour('');
-    setCheckInMinute('');
-    setCheckInAMPM('AM');
-    setCheckOutDate('');
-    setCheckOutHour('');
-    setCheckOutMinute('');
-    setCheckOutAMPM('AM');
-    setLastCheckIn({ date: '', time: '' });
-    setLastCheckOut({ date: '', time: '' });
+    async function fetchLastAttendance() {
+      setLoading(true);
+      try {
+        const res = await getHistory();
+        const today = new Date().toISOString().slice(0, 10);
+        let checkedIn = false, checkedOut = false, lastCI = {}, lastCO = {};
+        let yesterdayPendingCheckout = false;
+        let yesterdayDate;
+        if (res.data && Array.isArray(res.data)) {
+          // Sort latest first
+          const sorted = res.data.slice().sort((a, b) => b.date.localeCompare(a.date));
+          // Find today's record
+          const todayRecord = sorted.find(r => r.date === today);
+          if (todayRecord && todayRecord.checkin) {
+            checkedIn = true;
+            lastCI = {
+              date: todayRecord.date,
+              time: todayRecord.checkin,
+              approved: todayRecord.status === 'Accepted'
+            };
+            checkedOut = !!todayRecord.checkout;
+            if (checkedOut) {
+              lastCO = { date: todayRecord.date, time: todayRecord.checkout };
+            }
+          }
+          // Find yesterday's record
+          const yesterday = new Date();
+          yesterday.setDate(yesterday.getDate() - 1);
+          yesterdayDate = yesterday.toISOString().slice(0, 10);
+          const yestRecord = sorted.find(r => r.date === yesterdayDate);
+          if (yestRecord && yestRecord.checkin && !yestRecord.checkout) {
+            yesterdayPendingCheckout = true;
+          }
+        }
+        setHasCheckedIn(checkedIn);
+        setHasCheckedOut(checkedOut);
+        setLastCheckIn(lastCI);
+        setLastCheckOut(lastCO);
+        if (yesterdayPendingCheckout) {
+          setPendingCheckoutMsg("Yesterday's checkout is pending. Please check out for yesterday before you can check in today.");
+        } else {
+          setPendingCheckoutMsg('');
+        }
+      } catch (err) {
+        toast.error('Failed to fetch attendance history');
+      }
+      setLoading(false);
+    }
+    fetchLastAttendance();
   }, []);
 
+  // --- Logic for min/max dates ---
   const minDate = doj || '';
+  const todayStr = new Date().toISOString().slice(0, 10);
+
+  // --- Block check-in if yesterday's checkout is pending ---
+  const isCheckInBlocked = !!pendingCheckoutMsg;
+
+  // --- Block check-in if already checked in today ---
+  const isCheckInDisabled = hasCheckedIn || isCheckInBlocked;
+
+  // --- Show check-out only if checked-in and admin has approved, and not yet checked out ---
+  const isCheckOutDisabled = !hasCheckedIn || hasCheckedOut || !lastCheckIn.approved;
+
+  // --- Only allow selecting today for check-in/checkout (could adjust if you want to allow previous days etc) ---
+  const checkInMaxDate = todayStr;
+  const checkInMinDate = minDate;
+  const checkOutMaxDate = todayStr;
+  const checkOutMinDate = minDate;
 
   // --- Handle Check-In ---
   const handleCheckIn = () => setShowCheckIn(true);
@@ -164,17 +221,22 @@ const AttendanceTab = ({ doj }) => {
       toast.error('Please select date and time for check-in.');
       return;
     }
-    const time24 = to24HourFormat(checkInHour, checkInMinute, checkInAMPM);
+    // Only allow today
+    if (checkInDate !== todayStr) {
+      toast.error('You can only check in for today.');
+      return;
+    }
+    setShowCheckIn(false);
     try {
+      const time24 = to24HourFormat(checkInHour, checkInMinute, checkInAMPM);
       const dateTime = `${checkInDate}T${time24}`;
       await checkin({ datetime: dateTime });
-      setLastCheckIn({ date: checkInDate, time: `${checkInHour.padStart(2, "0")}:${checkInMinute.padStart(2, "0")} ${checkInAMPM}` });
+      setLastCheckIn({ date: checkInDate, time: `${checkInHour.padStart(2, "0")}:${checkInMinute.padStart(2, "0")} ${checkInAMPM}`, approved: false });
       setHasCheckedIn(true);
       toast.success('Check-in submitted for approval');
-      setShowCheckIn(false);
     } catch (err) {
       toast.error('Check-in failed');
-      console.error(err);
+      setHasCheckedIn(false);
     }
   };
 
@@ -187,21 +249,25 @@ const AttendanceTab = ({ doj }) => {
       toast.error('Please select date and time for check-out.');
       return;
     }
-    const time24 = to24HourFormat(checkOutHour, checkOutMinute, checkOutAMPM);
+    // Only allow today
+    if (checkOutDate !== todayStr) {
+      toast.error('You can only check out for today.');
+      return;
+    }
+    setShowCheckOut(false);
     try {
+      const time24 = to24HourFormat(checkOutHour, checkOutMinute, checkOutAMPM);
       const dateTime = `${checkOutDate}T${time24}`;
       await checkout({ datetime: dateTime });
       setLastCheckOut({ date: checkOutDate, time: `${checkOutHour.padStart(2, "0")}:${checkOutMinute.padStart(2, "0")} ${checkOutAMPM}` });
-      setHasCheckedIn(false);
+      setHasCheckedOut(true);
       toast.success('Checked out successfully');
-      setShowCheckOut(false);
     } catch (err) {
       toast.error('Check-out failed');
-      console.error(err);
+      setHasCheckedOut(false);
     }
   };
 
-  // --- UI for AM/PM time selection ---
   const renderTimeSelector = (hour, setHour, minute, setMinute, ampm, setAMPM) => (
     <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
       <input
@@ -211,7 +277,7 @@ const AttendanceTab = ({ doj }) => {
         value={hour}
         onChange={e => {
           let val = e.target.value;
-          if (val === '' || (parseInt(val, 10) >= 1 && parseInt(val, 10) <= 12)) setHour(val.replace(/^0+/, '') || ''); // Remove leading zeros
+          if (val === '' || (parseInt(val, 10) >= 1 && parseInt(val, 10) <= 12)) setHour(val.replace(/^0+/, '') || '');
         }}
         required
         style={{ width: 48 }}
@@ -234,7 +300,7 @@ const AttendanceTab = ({ doj }) => {
       <select
         value={ampm}
         onChange={e => setAMPM(e.target.value)}
-        style={{ width: 60 }} // Set height here (e.g., 44px)
+        style={{ width: 60 }}
       >
         <option value="AM">AM</option>
         <option value="PM">PM</option>
@@ -244,22 +310,28 @@ const AttendanceTab = ({ doj }) => {
 
   return (
     <div className="card" style={{ position: "relative" }}>
+      {isCheckInBlocked &&
+        <div style={{ color: "#c0392b", marginBottom: "1rem", fontWeight: 500, textAlign: "center" }}>
+          {pendingCheckoutMsg}
+        </div>
+      }
       <div className="btn-group">
         <button
           onClick={handleCheckIn}
-          disabled={hasCheckedIn}
-          style={hasCheckedIn ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
+          disabled={isCheckInDisabled}
+          style={isCheckInDisabled ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
         >
           Check In
         </button>
         <button
           onClick={handleCheckOut}
-          disabled={!hasCheckedIn}
-          style={!hasCheckedIn ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
+          disabled={isCheckOutDisabled}
+          style={isCheckOutDisabled ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
         >
           Check Out
         </button>
       </div>
+      {/* Check-In Modal */}
       {showCheckIn && (
         <form className="attendance-form-modal" onSubmit={handleCheckInSubmit} style={{ position: "relative" }}>
           <button
@@ -287,10 +359,11 @@ const AttendanceTab = ({ doj }) => {
               type="date"
               value={checkInDate}
               onChange={e => setCheckInDate(e.target.value)}
-              min={minDate}
-              max={new Date().toISOString().slice(0, 10)}
+              min={checkInMinDate}
+              max={checkInMaxDate}
               required
               className="calendar-input"
+              disabled
             />
           </label>
           <label>
@@ -302,6 +375,7 @@ const AttendanceTab = ({ doj }) => {
           </div>
         </form>
       )}
+      {/* Check-Out Modal */}
       {showCheckOut && (
         <form className="attendance-form-modal" onSubmit={handleCheckOutSubmit} style={{ position: "relative" }}>
           <button
@@ -329,10 +403,11 @@ const AttendanceTab = ({ doj }) => {
               type="date"
               value={checkOutDate}
               onChange={e => setCheckOutDate(e.target.value)}
-              min={minDate}
-              max={new Date().toISOString().slice(0, 10)}
+              min={checkOutMinDate}
+              max={checkOutMaxDate}
               required
               className="calendar-input"
+              disabled
             />
           </label>
           <label>
@@ -346,7 +421,7 @@ const AttendanceTab = ({ doj }) => {
       )}
       {lastCheckIn.date && lastCheckIn.time && (
         <p style={{ marginTop: '1rem', fontSize: '14px' }}>
-          ✅ Checked in at: <strong>{lastCheckIn.date} {lastCheckIn.time}</strong>
+          ✅ Checked in at: <strong>{lastCheckIn.date} {lastCheckIn.time}</strong> {lastCheckIn.approved === false ? <span style={{ color: "#f39c12" }}>(Pending approval)</span> : ""}
         </p>
       )}
       {lastCheckOut.date && lastCheckOut.time && (
@@ -483,7 +558,6 @@ const holidays = [
 
 const getNextHoliday = () => {
   const today = new Date();
-  // Find first holiday with date >= today
   return holidays.find(h => new Date(h.date) >= today) || null;
 };
 
@@ -575,17 +649,41 @@ const ProfileTab = ({ employee, setEditMode, editMode, onSave }) => (
         <label>Email
           <input type="email" name="email" defaultValue={employee.email} placeholder="Enter your email address" required />
         </label>
-        <label>Position
+        {/* <label>Position
           <input type="text" name="position" defaultValue={employee.position} placeholder="Enter your job title" required />
-        </label>
-        <label>Department
+        </label> */}
+        {/* <label>Department
           <input type="text" name="department" defaultValue={employee.department} placeholder="Enter your department" required />
         </label>
         <label>Date of Joining
           <input type="date" name="doj" defaultValue={employee.doj} placeholder="Select your joining date" required />
-        </label>
+        </label> */}
         <label>Blood Group
-          <input type="text" name="bloodGroup" defaultValue={employee.bloodGroup} placeholder="E.g., O+, A-, B+" required />
+          <select
+            name="bloodGroup"
+            defaultValue={employee.bloodGroup}
+            required
+            style={{
+              width: "95%",
+              minWidth: 0,
+              fontSize: "1.08rem",
+              padding: "9px 12px",
+              border: "1px solid #ccc",
+              borderRadius: "7px",
+              background: "#fcfcfc",
+              boxSizing: "border-box",
+              marginBottom: "0.3rem",
+              outline: "none",
+              transition: "border-color 0.2s",
+              height: "38px",
+              alignItems: "center",
+            }}
+          >
+            <option value="">Select Blood Group</option>
+            {bloodGroups.filter(bg => bg !== "").map(bg => (
+              <option key={bg} value={bg}>{bg}</option>
+            ))}
+          </select>
         </label>
         <div className="modal-buttons">
           <button type="submit">Update</button>
@@ -663,14 +761,17 @@ const EmployeeDashboard = () => {
     const updated = {
       name: form.name.value,
       email: form.email.value,
-      position: form.position.value,
-      department: form.department.value,
-      doj: form.doj.value,
+      // position: form.position.value,
+      // department: form.department.value,
+      // doj: form.doj.value,
       bloodGroup: form.bloodGroup.value,
     };
     try {
       await updateEmployeeProfile(updated);
-      setEmployee(updated);
+      setEmployee({
+        ...employee,
+        ...updated,
+      });
       setEditMode(false);
       toast.success('Profile updated successfully');
     } catch (err) {

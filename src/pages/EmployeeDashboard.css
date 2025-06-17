@@ -148,6 +148,7 @@ body, html {
   align-items: center;
   text-align: center;
   box-sizing: border-box;
+  background-color: #eaf5ff;
 }
 
 .card {
