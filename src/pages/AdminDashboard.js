@@ -9,7 +9,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import { useNavigate } from 'react-router-dom';
 import './AdminDashboard.css';
 import { FaChartBar, FaClock, FaUserPlus, FaCalendarAlt, FaFileUpload, FaSignOutAlt } from 'react-icons/fa';
-import logo from '../assets/logooo.jpg'; // Make sure this path is correct or update accordingly
+// import logo from '../assets/logooo.jpg'; // Make sure this path is correct or update accordingly
 
 const Sidebar = ({ activeTab, setActiveTab, handleLogout }) => (
   <aside className="sidebar">
@@ -28,9 +28,9 @@ const Sidebar = ({ activeTab, setActiveTab, handleLogout }) => (
 const TopNavbar = () => (
   <header className="dashboard-navbar">
     <div className="navbar-title">Admin Dashboard</div>
-    <div style={{ position: "absolute", right: 24, top: 26 }}>
+    {/* <div style={{ position: "absolute", right: 24, top: 30 }}>
       <img src={logo} alt="Logo" className="navbar-logo-top-right" style={{ height: 40, width: 'auto', marginRight: 16 }} />
-    </div>
+    </div> */}
   </header>
 );
 

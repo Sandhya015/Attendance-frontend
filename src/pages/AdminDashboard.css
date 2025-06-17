@@ -1,13 +1,21 @@
-/* AdminDashboard.css */
+/* AdminDashboard.css - Scrollable Main Card, Proper Logo Alignment, No Mobile Responsiveness */
+
+body, html {
+  margin: 0;
+  font-family: 'Segoe UI', sans-serif;
+  background: #f5f7fa;
+  height: 100%;
+  /* Do NOT set overflow: hidden here, let .admin-card scroll */
+}
 
 .admin-container {
   display: flex;
   justify-content: center;
-  padding: 20px;
-  background: #f5f7fa;
+  align-items: flex-start;
   min-height: 100vh;
   height: 100vh;
-  overflow: hidden; /* Prevent body from scrolling, let .admin-card scroll */
+  background: #f5f7fa;
+  /* Do NOT set overflow: hidden here! */
 }
 
 .admin-card {
@@ -18,7 +26,7 @@
   padding: 30px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   height: 100vh;
-  overflow-y: auto; /* Make the admin main area scrollable */
+  overflow-y: auto; /* This makes only the card scrollable */
   display: flex;
   flex-direction: column;
 }
@@ -29,20 +37,27 @@
   align-items: center;
 }
 
+/* LOGO AND TITLE: PROPERLY ALIGNED, NO HUGE GAP */
 .admin-logo-title {
   display: flex;
   align-items: center;
-  gap: 350px;
+  justify-content: space-between;
+  width: 100%;
+  gap: 0;
 }
 
 .admin-logo-title img {
   width: 150px;
+  height: auto;
+  display: block;
 }
 
-.admin-header-flex h2 {
+.admin-logo-title h2 {
   font-size: 28px;
   font-weight: bold;
   color: #2c3e50;
+  margin: 0;
+  padding-left: 24px;
 }
 
 .logout-btn {
@@ -66,7 +81,15 @@
   gap: 15px;
   flex-wrap: wrap;
 }
-
+.main-area {
+  flex: 1;
+  margin-left: 320px;
+  height: 100vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  scroll-behavior: auto;
+}
 .tab-switch button {
   padding: 10px 20px;
   border: 2px solid #3498db;

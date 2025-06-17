@@ -16,27 +16,43 @@ import logo from '../assets/logooo.jpg';
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
-const Sidebar = ({ activeTab, setActiveTab, handleLogout, sidebarOpen, onClose }) => (
-  <>
-    <div className={`sidebar-overlay ${sidebarOpen ? 'visible' : ''}`} onClick={onClose}></div>
-    <aside className={`sidebar ${sidebarOpen ? 'sidebar-open' : ''}`}>
-      <div className="sidebar-logo">Employee</div>
-      <ul>
-        <li className={activeTab === 'dashboard' ? 'active' : ''} onClick={() => { setActiveTab('dashboard'); onClose(); }}><FaHome /> Dashboard</li>
-        <li className={activeTab === 'profile' ? 'active' : ''} onClick={() => { setActiveTab('profile'); onClose(); }}><FaUser /> Profile</li>
-        <li className={activeTab === 'attendance' ? 'active' : ''} onClick={() => { setActiveTab('attendance'); onClose(); }}><FaClock /> Attendance</li>
-        <li className={activeTab === 'leave' ? 'active' : ''} onClick={() => { setActiveTab('leave'); onClose(); }}><FaRegCalendarAlt /> Leave Request</li>
-        <li className={activeTab === 'holiday' ? 'active' : ''} onClick={() => { setActiveTab('holiday'); onClose(); }}><FaCalendarAlt /> Holiday Calendar</li>
-        <li className={activeTab === 'history' ? 'active' : ''} onClick={() => { setActiveTab('history'); onClose(); }}><FaHistory /> Attendance History</li>
-        <li onClick={() => { handleLogout(); onClose(); }}><FaSignOutAlt /> Logout</li>
-      </ul>
-    </aside>
-  </>
+// --- utility: convert hour/min/ampm to "HH:MM" 24-hour string ---
+function to24HourFormat(hour, minute, ampm) {
+  hour = parseInt(hour, 10);
+  minute = minute.toString().padStart(2, "0");
+  if (ampm === "PM" && hour !== 12) hour += 12;
+  if (ampm === "AM" && hour === 12) hour = 0;
+  return `${hour.toString().padStart(2, "0")}:${minute}`;
+}
+
+function to12HourFormat(time24) {
+  if (!time24) return '';
+  let [h, m] = time24.split(':');
+  h = parseInt(h, 10);
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12 || 12;
+  return `${h}:${m} ${ampm}`;
+}
+
+// --- SIDEBAR: Only for desktop, no mobile overlay ---
+const Sidebar = ({ activeTab, setActiveTab, handleLogout }) => (
+  <aside className="sidebar">
+    <div className="sidebar-logo">Employee</div>
+    <ul>
+      <li className={activeTab === 'dashboard' ? 'active' : ''} onClick={() => setActiveTab('dashboard')}><FaHome /> Dashboard</li>
+      <li className={activeTab === 'profile' ? 'active' : ''} onClick={() => setActiveTab('profile')}><FaUser /> Profile</li>
+      <li className={activeTab === 'attendance' ? 'active' : ''} onClick={() => setActiveTab('attendance')}><FaClock /> Attendance</li>
+      <li className={activeTab === 'leave' ? 'active' : ''} onClick={() => setActiveTab('leave')}><FaRegCalendarAlt /> Leave Request</li>
+      <li className={activeTab === 'holiday' ? 'active' : ''} onClick={() => setActiveTab('holiday')}><FaCalendarAlt /> Holiday Calendar</li>
+      <li className={activeTab === 'history' ? 'active' : ''} onClick={() => setActiveTab('history')}><FaHistory /> Attendance History</li>
+      <li onClick={handleLogout}><FaSignOutAlt /> Logout</li>
+    </ul>
+  </aside>
 );
 
-const TopNavbar = ({ onMenuClick }) => (
+// --- TOP NAVBAR: No hamburger, always visible ---
+const TopNavbar = () => (
   <header className="dashboard-navbar">
-    <button className="hamburger-btn" onClick={onMenuClick}>☰</button>
     <div className="navbar-title">Employee Dashboard</div>
     <img src={logo} alt="Logo" className="navbar-logo-top-right" />
   </header>
@@ -46,7 +62,11 @@ const SummaryCards = ({ summary, leavesLeft, nextHoliday, employee }) => (
   <div className="summary-cards">
     <div className="card">
       <h4>Upcoming Holiday</h4>
-      <p><small>{nextHoliday?.date || ''}</small></p>
+      <p>
+        <small>
+          {nextHoliday ? `${nextHoliday.date} - ${nextHoliday.name}` : 'No upcoming holiday'}
+        </small>
+      </p>
     </div>
     <div className="card">
       <h4>Leaves Taken</h4>
@@ -100,29 +120,56 @@ const DashboardTab = ({ employee }) => {
   );
 };
 
-const AttendanceTab = () => {
-  const [checkInTime, setCheckInTime] = useState('');
-  const [checkOutTime, setCheckOutTime] = useState('');
+const AttendanceTab = ({ doj }) => {
+  // For check-in
   const [checkInDate, setCheckInDate] = useState('');
+  const [checkInHour, setCheckInHour] = useState('');
+  const [checkInMinute, setCheckInMinute] = useState('');
+  const [checkInAMPM, setCheckInAMPM] = useState('AM');
+  // For check-out
   const [checkOutDate, setCheckOutDate] = useState('');
+  const [checkOutHour, setCheckOutHour] = useState('');
+  const [checkOutMinute, setCheckOutMinute] = useState('');
+  const [checkOutAMPM, setCheckOutAMPM] = useState('AM');
+  // Show forms
   const [showCheckIn, setShowCheckIn] = useState(false);
   const [showCheckOut, setShowCheckOut] = useState(false);
+  // State for display
+  const [hasCheckedIn, setHasCheckedIn] = useState(false);
+  const [lastCheckIn, setLastCheckIn] = useState({ date: '', time: '' });
+  const [lastCheckOut, setLastCheckOut] = useState({ date: '', time: '' });
 
+  useEffect(() => {
+    setHasCheckedIn(false);
+    setCheckInDate('');
+    setCheckInHour('');
+    setCheckInMinute('');
+    setCheckInAMPM('AM');
+    setCheckOutDate('');
+    setCheckOutHour('');
+    setCheckOutMinute('');
+    setCheckOutAMPM('AM');
+    setLastCheckIn({ date: '', time: '' });
+    setLastCheckOut({ date: '', time: '' });
+  }, []);
+
+  const minDate = doj || '';
+
+  // --- Handle Check-In ---
   const handleCheckIn = () => setShowCheckIn(true);
-  const handleCheckOut = () => setShowCheckOut(true);
 
   const handleCheckInSubmit = async (e) => {
     e.preventDefault();
-    if (!checkInDate) {
-      toast.error('Please select a date for check-in.');
+    if (!checkInDate || !checkInHour || !checkInMinute || !checkInAMPM) {
+      toast.error('Please select date and time for check-in.');
       return;
     }
-    const now = new Date();
-    const dateTime = new Date(`${checkInDate}T${now.getHours()}:${now.getMinutes()}`);
-
+    const time24 = to24HourFormat(checkInHour, checkInMinute, checkInAMPM);
     try {
-      await checkin({ datetime: dateTime.toISOString().slice(0, 16) });
-      setCheckInTime(now.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' }));
+      const dateTime = `${checkInDate}T${time24}`;
+      await checkin({ datetime: dateTime });
+      setLastCheckIn({ date: checkInDate, time: `${checkInHour.padStart(2, "0")}:${checkInMinute.padStart(2, "0")} ${checkInAMPM}` });
+      setHasCheckedIn(true);
       toast.success('Check-in submitted for approval');
       setShowCheckIn(false);
     } catch (err) {
@@ -131,18 +178,21 @@ const AttendanceTab = () => {
     }
   };
 
+  // --- Handle Check-Out ---
+  const handleCheckOut = () => setShowCheckOut(true);
+
   const handleCheckOutSubmit = async (e) => {
     e.preventDefault();
-    if (!checkOutDate) {
-      toast.error('Please select a date for check-out.');
+    if (!checkOutDate || !checkOutHour || !checkOutMinute || !checkOutAMPM) {
+      toast.error('Please select date and time for check-out.');
       return;
     }
-    const now = new Date();
-    const dateTime = new Date(`${checkOutDate}T${now.getHours()}:${now.getMinutes()}`);
-
+    const time24 = to24HourFormat(checkOutHour, checkOutMinute, checkOutAMPM);
     try {
-      await checkout({ datetime: dateTime.toISOString().slice(0, 16) });
-      setCheckOutTime(now.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' }));
+      const dateTime = `${checkOutDate}T${time24}`;
+      await checkout({ datetime: dateTime });
+      setLastCheckOut({ date: checkOutDate, time: `${checkOutHour.padStart(2, "0")}:${checkOutMinute.padStart(2, "0")} ${checkOutAMPM}` });
+      setHasCheckedIn(false);
       toast.success('Checked out successfully');
       setShowCheckOut(false);
     } catch (err) {
@@ -151,31 +201,101 @@ const AttendanceTab = () => {
     }
   };
 
+  // --- UI for AM/PM time selection ---
+  const renderTimeSelector = (hour, setHour, minute, setMinute, ampm, setAMPM) => (
+    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+      <input
+        type="number"
+        min="1"
+        max="12"
+        value={hour}
+        onChange={e => {
+          let val = e.target.value;
+          if (val === '' || (parseInt(val, 10) >= 1 && parseInt(val, 10) <= 12)) setHour(val.replace(/^0+/, '') || ''); // Remove leading zeros
+        }}
+        required
+        style={{ width: 48 }}
+        placeholder="HH"
+      />
+      <span>:</span>
+      <input
+        type="number"
+        min="0"
+        max="59"
+        value={minute}
+        onChange={e => {
+          let val = e.target.value;
+          if (val === '' || (parseInt(val, 10) >= 0 && parseInt(val, 10) <= 59)) setMinute(val.replace(/^0+/, '') || '');
+        }}
+        required
+        style={{ width: 48 }}
+        placeholder="MM"
+      />
+      <select
+        value={ampm}
+        onChange={e => setAMPM(e.target.value)}
+        style={{ width: 60 }} // Set height here (e.g., 44px)
+      >
+        <option value="AM">AM</option>
+        <option value="PM">PM</option>
+      </select>
+    </div>
+  );
+
   return (
-    <div className="card">
+    <div className="card" style={{ position: "relative" }}>
       <div className="btn-group">
-        <button onClick={handleCheckIn}>Check In</button>
-        <button onClick={handleCheckOut}>Check Out</button>
+        <button
+          onClick={handleCheckIn}
+          disabled={hasCheckedIn}
+          style={hasCheckedIn ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
+        >
+          Check In
+        </button>
+        <button
+          onClick={handleCheckOut}
+          disabled={!hasCheckedIn}
+          style={!hasCheckedIn ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
+        >
+          Check Out
+        </button>
       </div>
       {showCheckIn && (
-        <form className="attendance-form-modal" onSubmit={handleCheckInSubmit}>
+        <form className="attendance-form-modal" onSubmit={handleCheckInSubmit} style={{ position: "relative" }}>
+          <button
+            type="button"
+            className="close-btn"
+            title="Cancel"
+            style={{
+              background: "none",
+              border: "none",
+              fontSize: 18,
+              color: "#888",
+              cursor: "pointer",
+              position: "absolute",
+              right: 12,
+              top: 8,
+              zIndex: 2
+            }}
+            onClick={() => setShowCheckIn(false)}
+          >
+            <FaTimes />
+          </button>
           <label>
             Date
             <input
               type="date"
               value={checkInDate}
               onChange={e => setCheckInDate(e.target.value)}
+              min={minDate}
+              max={new Date().toISOString().slice(0, 10)}
               required
               className="calendar-input"
             />
           </label>
           <label>
             Time
-            <input
-              type="text"
-              value={new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-              disabled
-            />
+            {renderTimeSelector(checkInHour, setCheckInHour, checkInMinute, setCheckInMinute, checkInAMPM, setCheckInAMPM)}
           </label>
           <div>
             <button type="submit">Submit</button>
@@ -183,50 +303,61 @@ const AttendanceTab = () => {
         </form>
       )}
       {showCheckOut && (
-        <form className="attendance-form-modal" onSubmit={handleCheckOutSubmit}>
+        <form className="attendance-form-modal" onSubmit={handleCheckOutSubmit} style={{ position: "relative" }}>
+          <button
+            type="button"
+            className="close-btn"
+            title="Cancel"
+            style={{
+              background: "none",
+              border: "none",
+              fontSize: 18,
+              color: "#888",
+              cursor: "pointer",
+              position: "absolute",
+              right: 12,
+              top: 8,
+              zIndex: 2
+            }}
+            onClick={() => setShowCheckOut(false)}
+          >
+            <FaTimes />
+          </button>
           <label>
             Date
             <input
               type="date"
               value={checkOutDate}
               onChange={e => setCheckOutDate(e.target.value)}
+              min={minDate}
+              max={new Date().toISOString().slice(0, 10)}
               required
               className="calendar-input"
             />
           </label>
           <label>
             Time
-            <input
-              type="text"
-              value={new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-              disabled
-            />
+            {renderTimeSelector(checkOutHour, setCheckOutHour, checkOutMinute, setCheckOutMinute, checkOutAMPM, setCheckOutAMPM)}
           </label>
           <div>
             <button type="submit">Submit</button>
-            <button type="button" className="cancel-btn" onClick={() => setShowCheckOut(false)}>
-
-            </button>
           </div>
         </form>
       )}
-      {checkInTime && checkInDate && (
+      {lastCheckIn.date && lastCheckIn.time && (
         <p style={{ marginTop: '1rem', fontSize: '14px' }}>
-          ✅ Checked in at: <strong>{checkInDate} {checkInTime}</strong>
+          ✅ Checked in at: <strong>{lastCheckIn.date} {lastCheckIn.time}</strong>
         </p>
       )}
-      {checkOutTime && checkOutDate && (
+      {lastCheckOut.date && lastCheckOut.time && (
         <p style={{ marginTop: '0.7rem', fontSize: '14px' }}>
-          ✅ Checked out at: <strong>{checkOutDate} {checkOutTime}</strong>
+          ✅ Checked out at: <strong>{lastCheckOut.date} {lastCheckOut.time}</strong>
         </p>
       )}
     </div>
   );
 };
 
-
-
-// LeaveTab and LeaveHistory side by side in a grid
 const LeaveTab = () => {
   const [leaveDate, setLeaveDate] = useState('');
   const [reason, setReason] = useState('');
@@ -259,7 +390,6 @@ const LeaveTab = () => {
 
   return (
     <div className="leave-tab-grid">
-      {/* Leave Request Form */}
       <div className="leave-form-card">
         <h3>Leave Request Form</h3>
         <form className="leave-form" onSubmit={handleLeaveSubmit}>
@@ -271,7 +401,7 @@ const LeaveTab = () => {
               onChange={e => setLeaveDate(e.target.value)}
               placeholder="dd / mm / yyyy"
               required
-              className="calendar-input" // style as per image1 in css
+              className="calendar-input"
             />
           </label>
           <label>
@@ -286,7 +416,6 @@ const LeaveTab = () => {
           <button type="submit" className="apply-btn">Apply Leave</button>
         </form>
       </div>
-      {/* Leave History Table */}
       <div className="leave-history-card">
         <h4>Leave History</h4>
         <table>
@@ -337,22 +466,28 @@ const LeaveTab = () => {
   );
 };
 
+const holidays = [
+  { date: '2025-01-26', name: 'Republic Day' },
+  { date: '2025-03-08', name: 'Maha Shivratri' },
+  { date: '2025-04-14', name: 'Ambedkar Jayanti' },
+  { date: '2025-05-01', name: 'May Day' },
+  { date: '2025-06-06', name: 'Eid al-Fitr' },
+  { date: '2025-08-15', name: 'Independence Day' },
+  { date: '2025-08-27', name: 'Ganesh Chaturthi' },
+  { date: '2025-10-02', name: 'Gandhi Jayanti' },
+  { date: '2025-10-20', name: 'Diwali' },
+  { date: '2025-11-01', name: 'Kannada Rajyotsava' },
+  { date: '2025-11-14', name: "Children's Day" },
+  { date: '2025-12-25', name: 'Christmas' }
+];
+
+const getNextHoliday = () => {
+  const today = new Date();
+  // Find first holiday with date >= today
+  return holidays.find(h => new Date(h.date) >= today) || null;
+};
+
 const HolidayTab = () => {
-  // Pagination logic for holiday calendar
-  const holidays = [
-    { date: '2025-05-01', name: 'May Day' },
-    { date: '2025-08-15', name: 'Independence Day' },
-    { date: '2025-08-27', name: 'Ganesh Chaturthi' },
-    { date: '2025-10-02', name: 'Gandhi Jayanti' },
-    { date: '2025-10-20', name: 'Diwali' },
-    { date: '2025-12-25', name: 'Christmas' },
-    { date: '2025-01-26', name: 'Republic Day' },
-    { date: '2025-03-08', name: 'Maha Shivratri' },
-    { date: '2025-04-14', name: 'Ambedkar Jayanti' },
-    { date: '2025-06-06', name: 'Eid al-Fitr' },
-    { date: '2025-11-14', name: 'Children\'s Day' },
-    { date: '2025-11-01', name: 'Kannada Rajyotsava' },
-  ];
   const [page, setPage] = useState(1);
   const perPage = 5;
   const totalPages = Math.ceil(holidays.length / perPage);
@@ -467,13 +602,12 @@ const HistoryTab = () => {
     const fetchHistory = async () => {
       try {
         const res = await getHistory();
-        setHistory(res.data); // Assumes array of { date, checkin, checkout }
+        setHistory(res.data);
       } catch (err) {
         console.error(err);
         toast.error('Failed to load attendance history');
       }
     };
-
     fetchHistory();
   }, []);
 
@@ -491,8 +625,8 @@ const HistoryTab = () => {
             history.map((record, i) => (
               <tr key={i}>
                 <td>{record.date}</td>
-                <td>{record.checkin || '—'}</td>
-                <td>{record.checkout || '—'}</td>
+                <td>{record.checkin ? to12HourFormat(record.checkin) : '—'}</td>
+                <td>{record.checkout ? to12HourFormat(record.checkout) : '—'}</td>
               </tr>
             ))
           )}
@@ -502,9 +636,7 @@ const HistoryTab = () => {
   );
 };
 
-
 const EmployeeDashboard = () => {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [summary, setSummary] = useState({ leavesTaken: 0, pendingRequests: 0 });
   const [employee, setEmployee] = useState({ name: '', email: '', position: '', department: '', doj: '', bloodGroup: '' });
@@ -512,12 +644,8 @@ const EmployeeDashboard = () => {
 
   const navigate = useNavigate();
   const leavesLeft = 20 - summary.leavesTaken;
-  const holidays = [
-    { name: 'May Day', date: '2025-05-01' },
-    { name: 'Diwali', date: '2025-10-20' }
-  ];
-  const today = new Date();
-  const nextHoliday = holidays.find(h => new Date(h.date) >= today);
+
+  const nextHoliday = getNextHoliday();
 
   useEffect(() => {
     getProfile().then(res => setEmployee(res.data)).catch(() => toast.error('Failed to load profile'));
@@ -551,25 +679,19 @@ const EmployeeDashboard = () => {
   };
 
   return (
-    
     <div className="dashboard-container">
       <Sidebar
         activeTab={activeTab}
-        setActiveTab={(tab) => {
-          setActiveTab(tab);
-          setSidebarOpen(false); // Close after selecting
-        }}
+        setActiveTab={setActiveTab}
         handleLogout={handleLogout}
-        sidebarOpen={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
       />
       <div className="main-area">
-        <TopNavbar onMenuClick={() => setSidebarOpen(true)} />
+        <TopNavbar />
         <main className="main-content">
           <SummaryCards summary={summary} leavesLeft={leavesLeft} nextHoliday={nextHoliday} employee={employee} />
           {activeTab === 'dashboard' && <DashboardTab employee={employee} />}
           {activeTab === 'profile' && <ProfileTab employee={employee} setEditMode={setEditMode} editMode={editMode} onSave={handleProfileSave} />}
-          {activeTab === 'attendance' && <AttendanceTab />}
+          {activeTab === 'attendance' && <AttendanceTab doj={employee.doj} />}
           {activeTab === 'history' && <HistoryTab />}
           {activeTab === 'leave' && <LeaveTab />}
           {activeTab === 'holiday' && <HolidayTab />}
