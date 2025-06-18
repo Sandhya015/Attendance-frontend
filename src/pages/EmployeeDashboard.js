@@ -20,7 +20,6 @@ const bloodGroups = [
   "", "A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"
 ];
 
-// --- utility: convert hour/min/ampm to "HH:MM" 24-hour string ---
 function to24HourFormat(hour, minute, ampm) {
   hour = parseInt(hour, 10);
   minute = minute.toString().padStart(2, "0");
@@ -28,7 +27,6 @@ function to24HourFormat(hour, minute, ampm) {
   if (ampm === "AM" && hour === 12) hour = 0;
   return `${hour.toString().padStart(2, "0")}:${minute}`;
 }
-
 function to12HourFormat(time24) {
   if (!time24) return '';
   let [h, m] = time24.split(':');
@@ -36,6 +34,11 @@ function to12HourFormat(time24) {
   const ampm = h >= 12 ? 'PM' : 'AM';
   h = h % 12 || 12;
   return `${h}:${m} ${ampm}`;
+}
+function formatDateDMY(dateStr) {
+  if (!dateStr) return "";
+  const [y, m, d] = dateStr.split("-");
+  return `${d}-${m}-${y}`;
 }
 
 const Sidebar = ({ activeTab, setActiveTab, handleLogout }) => (
@@ -123,153 +126,152 @@ const DashboardTab = ({ employee }) => {
 };
 
 const AttendanceTab = ({ doj }) => {
-  const [checkInDate, setCheckInDate] = useState('');
-  const [checkInHour, setCheckInHour] = useState('');
-  const [checkInMinute, setCheckInMinute] = useState('');
-  const [checkInAMPM, setCheckInAMPM] = useState('AM');
-  const [checkOutDate, setCheckOutDate] = useState('');
-  const [checkOutHour, setCheckOutHour] = useState('');
-  const [checkOutMinute, setCheckOutMinute] = useState('');
-  const [checkOutAMPM, setCheckOutAMPM] = useState('AM');
+  const [checkInHour, setCheckInHour] = useState("");
+  const [checkInMinute, setCheckInMinute] = useState("");
+  const [checkInAMPM, setCheckInAMPM] = useState("AM");
+  const [checkOutHour, setCheckOutHour] = useState("");
+  const [checkOutMinute, setCheckOutMinute] = useState("");
+  const [checkOutAMPM, setCheckOutAMPM] = useState("AM");
   const [showCheckIn, setShowCheckIn] = useState(false);
   const [showCheckOut, setShowCheckOut] = useState(false);
+
   const [hasCheckedIn, setHasCheckedIn] = useState(false);
   const [hasCheckedOut, setHasCheckedOut] = useState(false);
-  const [lastCheckIn, setLastCheckIn] = useState({ date: '', time: '', approved: false });
-  const [lastCheckOut, setLastCheckOut] = useState({ date: '', time: '' });
-  const [pendingCheckoutMsg, setPendingCheckoutMsg] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [adminApproved, setAdminApproved] = useState(false);
+  const [lastCheckIn, setLastCheckIn] = useState({ date: "", time: "", approved: false, status: "" });
+  const [lastCheckOut, setLastCheckOut] = useState({ date: "", time: "" });
+  const [pendingCheckoutMsg, setPendingCheckoutMsg] = useState("");
+  const [approvalMsg, setApprovalMsg] = useState("");
 
-  // Today's date string
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const today = new Date();
+  const todayStr = today.toISOString().slice(0, 10);
 
-  // Fetch latest attendance status/history
   useEffect(() => {
     async function fetchLastAttendance() {
-      setLoading(true);
       try {
         const res = await getHistory();
-        const today = new Date().toISOString().slice(0, 10);
-        let checkedIn = false, checkedOut = false, lastCI = {}, lastCO = {};
+        let checkedIn = false, checkedOut = false, adminOk = false, lastCI = {}, lastCO = {};
         let yesterdayPendingCheckout = false;
-        let yesterdayDate;
-        if (res.data && Array.isArray(res.data)) {
-          // Sort latest first
+        let approval = false;
+        let approvalText = "";
+        let yesterdayDate = new Date(today);
+        yesterdayDate.setDate(today.getDate() - 1);
+        const yestStr = yesterdayDate.toISOString().slice(0, 10);
+
+        if (Array.isArray(res.data)) {
           const sorted = res.data.slice().sort((a, b) => b.date.localeCompare(a.date));
-          // Find today's record
-          const todayRecord = sorted.find(r => r.date === today);
+          const todayRecord = sorted.find(r => r.date === todayStr);
           if (todayRecord && todayRecord.checkin) {
             checkedIn = true;
+            adminOk = todayRecord.status === "Accepted" || todayRecord.approved === true;
             lastCI = {
               date: todayRecord.date,
               time: todayRecord.checkin,
-              approved: todayRecord.status === 'Accepted'
+              approved: adminOk,
+              status: todayRecord.status
             };
             checkedOut = !!todayRecord.checkout;
             if (checkedOut) {
               lastCO = { date: todayRecord.date, time: todayRecord.checkout };
             }
           }
-          // Find yesterday's record
-          const yesterday = new Date();
-          yesterday.setDate(yesterday.getDate() - 1);
-          yesterdayDate = yesterday.toISOString().slice(0, 10);
-          const yestRecord = sorted.find(r => r.date === yesterdayDate);
+          const yestRecord = sorted.find(r => r.date === yestStr);
           if (yestRecord && yestRecord.checkin && !yestRecord.checkout) {
             yesterdayPendingCheckout = true;
+          }
+          if (adminOk && checkedIn && !checkedOut) {
+            approval = true;
+            approvalText = "✅ Your check-in has been approved.";
           }
         }
         setHasCheckedIn(checkedIn);
         setHasCheckedOut(checkedOut);
+        setAdminApproved(adminOk);
         setLastCheckIn(lastCI);
         setLastCheckOut(lastCO);
-        if (yesterdayPendingCheckout) {
-          setPendingCheckoutMsg("Yesterday's checkout is pending. Please check out for yesterday before you can check in today.");
-        } else {
-          setPendingCheckoutMsg('');
-        }
-      } catch (err) {
-        toast.error('Failed to fetch attendance history');
+        setApprovalMsg(approvalText);
+        setPendingCheckoutMsg(
+          yesterdayPendingCheckout
+            ? "⛔ Yesterday's checkout is pending. Please check out for yesterday before you can check in today."
+            : ""
+        );
+      } catch {
+        toast.error("Failed to fetch attendance history");
       }
-      setLoading(false);
     }
     fetchLastAttendance();
   }, []);
 
-  // --- Logic for min/max dates ---
-  const minDate = doj || '';
-  const checkInMinDate = minDate;
+  const checkInMinDate = doj || "";
   const checkInMaxDate = todayStr;
-  const checkOutMinDate = minDate;
+  const checkOutMinDate = doj || "";
   const checkOutMaxDate = todayStr;
-
-  // --- Block check-in if yesterday's checkout is pending ---
   const isCheckInBlocked = !!pendingCheckoutMsg;
-
-  // --- Block check-in if already checked in today ---
   const isCheckInDisabled = hasCheckedIn || isCheckInBlocked;
+  const isCheckOutDisabled = !hasCheckedIn || hasCheckedOut || !adminApproved;
 
-  // --- Show check-out only if checked-in and admin has approved, and not yet checked out ---
-  const isCheckOutDisabled = !hasCheckedIn || hasCheckedOut || !lastCheckIn.approved;
-
-  // --- Handle Check-In ---
-  const handleCheckIn = () => {
-    setCheckInDate(todayStr); // Pre-fill with today's date
-    setShowCheckIn(true);
-  };
+  const handleCheckIn = () => setShowCheckIn(true);
 
   const handleCheckInSubmit = async (e) => {
     e.preventDefault();
-    if (!checkInDate || !checkInHour || !checkInMinute || !checkInAMPM) {
-      toast.error('Please select date and time for check-in.');
+    if (!checkInHour || !checkInMinute || !checkInAMPM) {
+      toast.error("Please select time for check-in.");
       return;
     }
-    // Only allow today
-    if (checkInDate !== todayStr) {
-      toast.error('You can only check in for today.');
+    const dateToSend = todayStr;
+    if (dateToSend < checkInMinDate) {
+      toast.error("Cannot check in before your Date of Joining.");
+      return;
+    }
+    if (dateToSend > checkInMaxDate) {
+      toast.error("Cannot check in for future dates.");
       return;
     }
     setShowCheckIn(false);
     try {
       const time24 = to24HourFormat(checkInHour, checkInMinute, checkInAMPM);
-      const dateTime = `${checkInDate}T${time24}`;
+      const dateTime = `${dateToSend}T${time24}`;
       await checkin({ datetime: dateTime });
-      setLastCheckIn({ date: checkInDate, time: `${checkInHour.padStart(2, "0")}:${checkInMinute.padStart(2, "0")} ${checkInAMPM}`, approved: false });
+      setLastCheckIn({ date: dateToSend, time: `${checkInHour.padStart(2, "0")}:${checkInMinute.padStart(2, "0")} ${checkInAMPM}`, approved: false });
       setHasCheckedIn(true);
-      toast.success('Check-in submitted for approval');
+      setAdminApproved(false);
+      setApprovalMsg("");
+      toast.success("Check-in submitted for approval!");
     } catch (err) {
-      toast.error('Check-in failed');
+      toast.error(err?.response?.data?.msg || "Check-in failed");
       setHasCheckedIn(false);
+      setAdminApproved(false);
+      setApprovalMsg("");
     }
   };
 
-  // --- Handle Check-Out ---
-  const handleCheckOut = () => {
-    setCheckOutDate(todayStr); // Pre-fill with today's date
-    setShowCheckOut(true);
-  };
+  const handleCheckOut = () => setShowCheckOut(true);
 
   const handleCheckOutSubmit = async (e) => {
     e.preventDefault();
-    if (!checkOutDate || !checkOutHour || !checkOutMinute || !checkOutAMPM) {
-      toast.error('Please select date and time for check-out.');
+    if (!checkOutHour || !checkOutMinute || !checkOutAMPM) {
+      toast.error("Please select time for check-out.");
       return;
     }
-    // Only allow today
-    if (checkOutDate !== todayStr) {
-      toast.error('You can only check out for today.');
+    const dateToSend = todayStr;
+    if (dateToSend < checkOutMinDate) {
+      toast.error("Cannot check out before your Date of Joining.");
+      return;
+    }
+    if (dateToSend > checkOutMaxDate) {
+      toast.error("Cannot check out for future dates.");
       return;
     }
     setShowCheckOut(false);
     try {
       const time24 = to24HourFormat(checkOutHour, checkOutMinute, checkOutAMPM);
-      const dateTime = `${checkOutDate}T${time24}`;
+      const dateTime = `${dateToSend}T${time24}`;
       await checkout({ datetime: dateTime });
-      setLastCheckOut({ date: checkOutDate, time: `${checkOutHour.padStart(2, "0")}:${checkOutMinute.padStart(2, "0")} ${checkOutAMPM}` });
+      setLastCheckOut({ date: dateToSend, time: `${checkOutHour.padStart(2, "0")}:${checkOutMinute.padStart(2, "0")} ${checkOutAMPM}` });
       setHasCheckedOut(true);
-      toast.success('Checked out successfully');
+      toast.success("Checked out successfully!");
     } catch (err) {
-      toast.error('Check-out failed');
+      toast.error(err?.response?.data?.msg || "Check-out failed");
       setHasCheckedOut(false);
     }
   };
@@ -283,7 +285,7 @@ const AttendanceTab = ({ doj }) => {
         value={hour}
         onChange={e => {
           let val = e.target.value;
-          if (val === '' || (parseInt(val, 10) >= 1 && parseInt(val, 10) <= 12)) setHour(val.replace(/^0+/, '') || '');
+          if (val === "" || (parseInt(val, 10) >= 1 && parseInt(val, 10) <= 12)) setHour(val.replace(/^0+/, "") || "");
         }}
         required
         style={{ width: 48 }}
@@ -297,7 +299,7 @@ const AttendanceTab = ({ doj }) => {
         value={minute}
         onChange={e => {
           let val = e.target.value;
-          if (val === '' || (parseInt(val, 10) >= 0 && parseInt(val, 10) <= 59)) setMinute(val.replace(/^0+/, '') || '');
+          if (val === "" || (parseInt(val, 10) >= 0 && parseInt(val, 10) <= 59)) setMinute(val.replace(/^0+/, "") || "");
         }}
         required
         style={{ width: 48 }}
@@ -316,11 +318,16 @@ const AttendanceTab = ({ doj }) => {
 
   return (
     <div className="card" style={{ position: "relative" }}>
-      {isCheckInBlocked &&
+      {isCheckInBlocked && (
         <div style={{ color: "#c0392b", marginBottom: "1rem", fontWeight: 500, textAlign: "center" }}>
           {pendingCheckoutMsg}
         </div>
-      }
+      )}
+      {approvalMsg && (
+        <div style={{ color: "#27ae60", marginBottom: "1rem", fontWeight: 500, textAlign: "center" }}>
+          {approvalMsg}
+        </div>
+      )}
       <div className="btn-group">
         <button
           onClick={handleCheckIn}
@@ -337,7 +344,6 @@ const AttendanceTab = ({ doj }) => {
           Check Out
         </button>
       </div>
-      {/* Check-In Modal */}
       {showCheckIn && (
         <form className="attendance-form-modal" onSubmit={handleCheckInSubmit} style={{ position: "relative" }}>
           <button
@@ -363,11 +369,8 @@ const AttendanceTab = ({ doj }) => {
             Date
             <input
               type="date"
-              value={checkInDate}
-              onChange={e => setCheckInDate(e.target.value)}
-              min={checkInMinDate}
-              max={checkInMaxDate}
-              required
+              value={todayStr}
+              readOnly
               className="calendar-input"
             />
           </label>
@@ -380,7 +383,6 @@ const AttendanceTab = ({ doj }) => {
           </div>
         </form>
       )}
-      {/* Check-Out Modal */}
       {showCheckOut && (
         <form className="attendance-form-modal" onSubmit={handleCheckOutSubmit} style={{ position: "relative" }}>
           <button
@@ -406,11 +408,8 @@ const AttendanceTab = ({ doj }) => {
             Date
             <input
               type="date"
-              value={checkOutDate}
-              onChange={e => setCheckOutDate(e.target.value)}
-              min={checkOutMinDate}
-              max={checkOutMaxDate}
-              required
+              value={todayStr}
+              readOnly
               className="calendar-input"
             />
           </label>
@@ -425,12 +424,15 @@ const AttendanceTab = ({ doj }) => {
       )}
       {lastCheckIn.date && lastCheckIn.time && (
         <p style={{ marginTop: '1rem', fontSize: '14px' }}>
-          ✅ Checked in at: <strong>{lastCheckIn.date} {lastCheckIn.time}</strong> {lastCheckIn.approved === false ? <span style={{ color: "#f39c12" }}>(Pending approval)</span> : ""}
+          ✅ Checked in at: <strong>{formatDateDMY(lastCheckIn.date)} {lastCheckIn.time}</strong>
+          {lastCheckIn.approved === false ? <span style={{ color: "#f39c12" }}> (Pending admin approval)</span>
+            : lastCheckIn.status === "Accepted" ? <span style={{ color: "#27ae60" }}> (Approved)</span>
+              : ""}
         </p>
       )}
       {lastCheckOut.date && lastCheckOut.time && (
         <p style={{ marginTop: '0.7rem', fontSize: '14px' }}>
-          ✅ Checked out at: <strong>{lastCheckOut.date} {lastCheckOut.time}</strong>
+          ✅ Checked out at: <strong>{formatDateDMY(lastCheckOut.date)} {lastCheckOut.time}</strong>
         </p>
       )}
     </div>
@@ -610,6 +612,47 @@ const HolidayTab = () => {
   );
 };
 
+const HistoryTab = () => {
+  const [history, setHistory] = useState([]);
+
+  useEffect(() => {
+    const fetchHistory = async () => {
+      try {
+        const res = await getHistory();
+        setHistory(res.data);
+      } catch (err) {
+        console.error(err);
+        toast.error('Failed to load attendance history');
+      }
+    };
+    fetchHistory();
+  }, []);
+
+  return (
+    <div className="card">
+      <h3>Attendance History</h3>
+      <table>
+        <thead>
+          <tr><th>Date</th><th>Check-in</th><th>Check-out</th></tr>
+        </thead>
+        <tbody>
+          {history.length === 0 ? (
+            <tr><td colSpan="3">No records found</td></tr>
+          ) : (
+            history.map((record, i) => (
+              <tr key={i}>
+                <td>{formatDateDMY(record.date)}</td>
+                <td>{record.checkin ? to12HourFormat(record.checkin) : '—'}</td>
+                <td>{record.checkout ? to12HourFormat(record.checkout) : '—'}</td>
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+};
+
 const ProfileTab = ({ employee, setEditMode, editMode, onSave }) => (
   <div className="card profile-view">
     <div className="profile-avatar-large">👤</div>
@@ -619,8 +662,8 @@ const ProfileTab = ({ employee, setEditMode, editMode, onSave }) => (
         <p><strong>Email:</strong> {employee.email}</p>
         <p><strong>Position:</strong> {employee.position}</p>
         <p><strong>Department:</strong> {employee.department}</p>
-        <p><strong>Blood Group:</strong> {employee.bloodGroup}</p>
-        <p><strong>Date of Joining:</strong> {employee.doj}</p>
+        <p><strong>Blood Group:</strong> {employee.bloodGroup || "-"}</p>
+        <p><strong>Date of Joining:</strong> {formatDateDMY(employee.doj)}</p>
         <div className="edit-button-container">
           <button className="edit-btn" onClick={() => setEditMode(true)}>Edit Profile</button>
         </div>
@@ -687,47 +730,6 @@ const ProfileTab = ({ employee, setEditMode, editMode, onSave }) => (
     )}
   </div>
 );
-
-const HistoryTab = () => {
-  const [history, setHistory] = useState([]);
-
-  useEffect(() => {
-    const fetchHistory = async () => {
-      try {
-        const res = await getHistory();
-        setHistory(res.data);
-      } catch (err) {
-        console.error(err);
-        toast.error('Failed to load attendance history');
-      }
-    };
-    fetchHistory();
-  }, []);
-
-  return (
-    <div className="card">
-      <h3>Attendance History</h3>
-      <table>
-        <thead>
-          <tr><th>Date</th><th>Check-in</th><th>Check-out</th></tr>
-        </thead>
-        <tbody>
-          {history.length === 0 ? (
-            <tr><td colSpan="3">No records found</td></tr>
-          ) : (
-            history.map((record, i) => (
-              <tr key={i}>
-                <td>{record.date}</td>
-                <td>{record.checkin ? to12HourFormat(record.checkin) : '—'}</td>
-                <td>{record.checkout ? to12HourFormat(record.checkout) : '—'}</td>
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
-    </div>
-  );
-};
 
 const EmployeeDashboard = () => {
   const [activeTab, setActiveTab] = useState('dashboard');

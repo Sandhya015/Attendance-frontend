@@ -549,6 +549,8 @@ def total_employees():
     return jsonify({'total_employees': total}), 200
 
 
+
+@jwt_required()
 @app.route('/employee/profile', methods=['GET'])
 @jwt_required()
 def employee_profile():
@@ -558,12 +560,14 @@ def employee_profile():
     if not user:
         return jsonify({"msg": "User not found"}), 404
 
+    # Map backend DB fields to frontend fields
     return jsonify({
-        "name": user.get("name"),
-        "email": user.get("email"),
-        "department": user.get("department"),
-        "position": user.get("position"),
-        "joinDate": user.get("joinDate"),
+        "name": user.get("name", ""),
+        "email": user.get("email", ""),
+        "department": user.get("department", ""),
+        "position": user.get("position", ""),
+        "doj": user.get("join_date") or user.get("joinDate", ""),   # "doj" for frontend, from join_date/joinDate in DB
+        "bloodGroup": user.get("bloodGroup") or user.get("blood_group", ""),  # support both
     }), 200
 
 
@@ -617,6 +621,7 @@ def add_employee():
         join_date = data.get('doj')
         department = data.get('department', 'Not Assigned')
         position = data.get('position', 'Not Assigned')
+        blood_group = data.get('bloodGroup', '')  # <-- ADD THIS
 
         # Validation
         if not all([name, email, password, join_date]):
@@ -634,7 +639,8 @@ def add_employee():
             "role": "employee",
             "join_date": join_date,
             "department": department,
-            "position": position
+            "position": position,
+            "bloodGroup": blood_group  # <-- ADD THIS
         }
 
         users_col.insert_one(new_employee)
@@ -644,7 +650,6 @@ def add_employee():
     except Exception as e:
         print("Error in /admin/add-employee:", e)
         return jsonify({"msg": "Server error"}), 500
-
 
         
 
